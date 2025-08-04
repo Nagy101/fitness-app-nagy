@@ -118,10 +118,11 @@ export default function CoursesManagement() {
 
   // Auth headers
   const getAuthHeaders = () => {
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("adminAuth");
+    console.log("Auth token found:", token ? "Yes" : "No");
     return {
       "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
+      Authorization: `Bearer ${token}`,
     };
   };
 
@@ -240,7 +241,8 @@ export default function CoursesManagement() {
       }
 
       // Get auth headers but exclude Content-Type for FormData
-      const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("adminAuth");
+      console.log("Auth token for form submission found:", token ? "Yes" : "No");
       const headers: Record<string, string> = {};
       if (token) {
         headers.Authorization = `Bearer ${token}`;
@@ -322,7 +324,8 @@ export default function CoursesManagement() {
       setIsSubmitting(true);
       
       // Get auth headers but exclude Content-Type for FormData
-      const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("adminAuth");
+      console.log("Auth token for delete found:", token ? "Yes" : "No");
       const headers: Record<string, string> = {};
       if (token) {
         headers.Authorization = `Bearer ${token}`;
@@ -423,6 +426,14 @@ export default function CoursesManagement() {
 
   // Load courses on mount
   useEffect(() => {
+    // Check if user is authenticated
+    const token = localStorage.getItem("adminAuth");
+    if (!token) {
+      console.warn("No admin token found, redirecting to login");
+      showErrorToast("Please login as admin to access this page");
+      window.location.href = "/admin/login";
+      return;
+    }
     fetchCourses();
   }, []);
 
