@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -75,6 +76,7 @@ type Course = {
 };
 
 export default function CoursesManagement() {
+  const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,7 +120,7 @@ export default function CoursesManagement() {
 
   // Auth headers
   const getAuthHeaders = () => {
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("adminAuth");
     return {
       "Content-Type": "application/json",
       Authorization: token ? `Bearer ${token}` : "",
@@ -141,6 +143,10 @@ export default function CoursesManagement() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem("adminAuth");
+      console.log("Auth token exists:", !!token);
+      console.log("Auth headers:", getAuthHeaders());
+      
       const res = await fetch(`${API_BASE}/AdminCourses/getAll`, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -156,7 +162,14 @@ export default function CoursesManagement() {
         console.log("Courses loaded:", coursesArray.length);
       } else {
         console.error("Failed to fetch courses:", data);
-        showErrorToast("Failed to load courses");
+        if (data.message === "Unauthorized" || res.status === 401) {
+          showErrorToast("Unauthorized access. Redirecting to login...");
+          setTimeout(() => {
+            router.push("/admin/login");
+          }, 2000);
+        } else {
+          showErrorToast(data.message || "Failed to load courses");
+        }
       }
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -422,8 +435,14 @@ export default function CoursesManagement() {
     return numPrice === 0 ? "Free" : `$${numPrice.toFixed(2)}`;
   };
 
-  // Load courses on mount
+  // Check authentication and load courses on mount
   useEffect(() => {
+    const token = localStorage.getItem("adminAuth");
+    if (!token) {
+      showErrorToast("Please log in to access admin features");
+      router.push("/admin/login");
+      return;
+    }
     fetchCourses();
   }, []);
 
