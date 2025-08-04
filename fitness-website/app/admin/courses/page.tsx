@@ -155,6 +155,10 @@ export default function CoursesManagement() {
         const coursesArray = Array.isArray(data) ? data : data.data || [];
         setCourses(coursesArray);
         console.log("Courses loaded:", coursesArray.length);
+      } else if (res.status === 404 && data?.message === "No Courses Found") {
+        // Handle empty courses list - this is normal for first time
+        setCourses([]);
+        console.log("No courses found - empty list");
       } else {
         console.error("Failed to fetch courses:", data);
         showErrorToast("Failed to load courses");
@@ -223,6 +227,19 @@ export default function CoursesManagement() {
         requestFormData.append("link", formData.link.trim());
       }
 
+      // Add admin_id if needed (check if backend requires it)
+      const adminData = localStorage.getItem("adminData");
+      if (adminData) {
+        try {
+          const parsed = JSON.parse(adminData);
+          if (parsed.admin_id) {
+            requestFormData.append("admin_id", parsed.admin_id);
+          }
+        } catch (e) {
+          console.warn("Failed to parse admin data:", e);
+        }
+      }
+
       // Add image file if selected
       if (imageFile) {
         requestFormData.append("image_url", imageFile);
@@ -277,6 +294,7 @@ export default function CoursesManagement() {
           data?.error ||
           `Failed to save. Server returned ${res.status}`;
         console.log("Showing error toast:", errorMessage);
+        console.log("Full error response:", data);
         setTimeout(() => showErrorToast(errorMessage), 100);
       }
     } catch (err) {
