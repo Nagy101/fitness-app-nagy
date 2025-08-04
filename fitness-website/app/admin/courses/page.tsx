@@ -151,7 +151,7 @@ export default function CoursesManagement() {
       console.log("Fetch Courses Response Data:", data);
 
       if (res.ok && data) {
-        const coursesArray = Array.isArray(data) ? data : data.courses || [];
+        const coursesArray = Array.isArray(data) ? data : data.data || data.courses || [];
         setCourses(coursesArray);
         console.log("Courses loaded:", coursesArray.length);
       } else {
@@ -166,26 +166,10 @@ export default function CoursesManagement() {
     }
   };
 
-  // Upload image
+  // Upload image - handled in course submission, not separately
   const uploadImage = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("image", file);
-    formData.append("folder", "Courses");
-
-    const response = await fetch(`${API_BASE}/upload`, {
-      method: "POST",
-      headers: {
-        Authorization: getAuthHeaders().Authorization,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to upload image");
-    }
-
-    const data = await parseResponse(response);
-    return data.image_url || data.url || data.path || "";
+    // This function is no longer needed as images are uploaded with the course data
+    return "";
   };
 
   // Handle image selection
@@ -233,46 +217,42 @@ export default function CoursesManagement() {
     try {
       setIsSubmitting(true);
 
-      let imageUrl = formData.image_url;
-      
-      // Upload image if selected
+      const endpoint = editingCourse
+        ? `AdminCourses/updateCourse/${editingCourse.course_id}`
+        : `AdminCourses/addCourse`;
+
+      // Prepare form data for multipart submission (handles both with and without images)
+      const formDataToSend = new FormData();
+      formDataToSend.append("title", formData.title.trim());
+      formDataToSend.append("price", formData.price.trim());
+      formDataToSend.append("content", formData.content.trim());
+      formDataToSend.append("description", formData.description.trim());
+      formDataToSend.append("link", formData.link.trim());
+
+      // Add image if selected
       if (imageFile) {
-        try {
-          imageUrl = await uploadImage(imageFile);
-          console.log("Image uploaded:", imageUrl);
-        } catch (error) {
-          console.error("Image upload failed:", error);
-          showErrorToast("Failed to upload image");
-          return;
-        }
+        formDataToSend.append("image_url", imageFile);
+        console.log("Adding image file to form data");
+      } else if (formData.image_url && !editingCourse) {
+        // For new courses with existing image URL
+        formDataToSend.append("image_url", formData.image_url);
       }
 
-      const requestBody = {
+      // Note: Course ID is passed in URL for updates, not in form data
+
+      console.log("Submitting course data:", {
         title: formData.title.trim(),
         price: formData.price.trim(),
-        image_url: imageUrl,
-        content: formData.content.trim(),
-        link: formData.link.trim(),
-        description: formData.description.trim(),
-      };
-
-      console.log("Course request body:", requestBody);
-
-      const endpoint = editingCourse
-        ? `AdminCourses/updateCourse`
-        : `AdminCourses/addCourse`;
-      
-      const method = editingCourse ? "POST" : "POST";
-
-      // Add course ID for update
-      if (editingCourse) {
-        requestBody.course_id = editingCourse.course_id;
-      }
+        hasImage: !!imageFile,
+        endpoint
+      });
 
       const res = await fetch(`${API_BASE}/${endpoint}`, {
-        method,
-        headers: getAuthHeaders(),
-        body: JSON.stringify(requestBody),
+        method: "POST",
+        headers: {
+          Authorization: getAuthHeaders().Authorization,
+        },
+        body: formDataToSend,
       });
 
       console.log("API Response Status:", res.status, res.statusText);
@@ -323,7 +303,11 @@ export default function CoursesManagement() {
       link: course.link || "",
       description: course.description || "",
     });
-    setImagePreview(course.image_url || "");
+    // Set image preview with correct URL
+    const imageUrl = course.image_url 
+      ? (course.image_url.startsWith('http') ? course.image_url : `${API_BASE}${course.image_url}`)
+      : "";
+    setImagePreview(imageUrl);
     setImageFile(null);
     setIsAddDialogOpen(true);
   };
@@ -344,11 +328,12 @@ export default function CoursesManagement() {
     try {
       setIsSubmitting(true);
       const res = await fetch(
-        `${API_BASE}/AdminCourses/deleteCourse`,
+        `${API_BASE}/AdminCourses/deleteCourse/${deleteTarget.id}`,
         {
           method: "DELETE",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ course_id: deleteTarget.id }),
+          headers: {
+            Authorization: getAuthHeaders().Authorization,
+          },
         }
       );
 
@@ -625,15 +610,23 @@ export default function CoursesManagement() {
                       <TableCell>
                         {course.image_url ? (
                           <img
-                            src={course.image_url}
+                            src={course.image_url.startsWith('http') ? course.image_url : `${API_BASE}${course.image_url}`}
                             alt={course.title}
                             className="w-12 h-12 object-cover rounded"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
                           />
                         ) : (
                           <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
                             <ImageIcon className="h-6 w-6 text-gray-400" />
                           </div>
                         )}
+                        <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center hidden">
+                          <ImageIcon className="h-6 w-6 text-gray-400" />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div>
